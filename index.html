@@ -8,7 +8,8 @@
     <style>
         .canvas-container {
             position: relative;
-            width: 400px;
+            width: 100%;
+            max-width: 400px;
             height: 600px;
             border: 1px solid #ccc;
             margin: auto;
@@ -29,6 +30,13 @@
             margin: 0 10px;
             cursor: pointer;
         }
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: red;
+            cursor: nwse-resize;
+        }
     </style>
 </head>
 <body>
@@ -40,6 +48,7 @@
         <div class="canvas-container">
             <canvas id="dollCanvas" width="400" height="600"></canvas>
             <canvas id="accessoryCanvas" width="400" height="600"></canvas>
+            <div id="resizeHandle" class="resize-handle"></div>
         </div>
         <div class="accessories">
             <img src="Glasses.png" alt="Glasses" class="accessory" data-type="glasses">
@@ -54,12 +63,14 @@
         const dollCanvas = document.getElementById('dollCanvas');
         const accessoryCanvas = document.getElementById('accessoryCanvas');
         const downloadBtn = document.getElementById('downloadBtn');
+        const resizeHandle = document.getElementById('resizeHandle');
         const dollCtx = dollCanvas.getContext('2d');
         const accessoryCtx = accessoryCanvas.getContext('2d');
 
         let accessories = {};
         let selectedAccessory = null;
         let isDragging = false;
+        let isResizing = false;
         let startX, startY;
 
         function drawStickFigure(ctx) {
@@ -84,6 +95,16 @@
             Object.values(accessories).forEach(accessory => {
                 accessoryCtx.drawImage(accessory.img, accessory.x, accessory.y, accessory.width, accessory.height);
             });
+        }
+
+        function updateResizeHandle() {
+            if (selectedAccessory) {
+                resizeHandle.style.display = 'block';
+                resizeHandle.style.left = `${selectedAccessory.x + selectedAccessory.width - 5}px`;
+                resizeHandle.style.top = `${selectedAccessory.y + selectedAccessory.height - 5}px`;
+            } else {
+                resizeHandle.style.display = 'none';
+            }
         }
 
         upload.addEventListener('change', (e) => {
@@ -114,6 +135,7 @@
                     accessories[type] = { img, x: 0, y: 0, width: 50, height: 50 };
                     selectedAccessory = accessories[type];
                     drawAccessories();
+                    updateResizeHandle();
                 };
                 img.src = e.target.src;
             });
@@ -132,6 +154,7 @@
                     startY = y - accessory.y;
                 }
             });
+            updateResizeHandle();
         });
 
         accessoryCanvas.addEventListener('mousemove', (e) => {
@@ -140,19 +163,36 @@
                 selectedAccessory.x = e.clientX - rect.left - startX;
                 selectedAccessory.y = e.clientY - rect.top - startY;
                 drawAccessories();
+                updateResizeHandle();
             }
         });
 
-        accessoryCanvas.addEventListener('mouseup', () => { isDragging = false; });
+        accessoryCanvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
 
-        accessoryCanvas.addEventListener('wheel', (e) => {
-            if (selectedAccessory) {
-                e.preventDefault();
-                const delta = e.deltaY > 0 ? -5 : 5;
-                selectedAccessory.width = Math.max(10, selectedAccessory.width + delta);
-                selectedAccessory.height = Math.max(10, selectedAccessory.height + delta);
+        resizeHandle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            e.stopPropagation();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isResizing && selectedAccessory) {
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                selectedAccessory.width += deltaX;
+                selectedAccessory.height += deltaY;
+                startX = e.clientX;
+                startY = e.clientY;
                 drawAccessories();
+                updateResizeHandle();
             }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isResizing = false;
         });
 
         downloadBtn.addEventListener('click', () => {
@@ -167,6 +207,62 @@
             link.href = finalCanvas.toDataURL();
             link.click();
         });
+
+        // Mobile touch events
+        accessoryCanvas.addEventListener('touchstart', (e) => {
+            const rect = accessoryCanvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+            Object.values(accessories).forEach(accessory => {
+                if (x >= accessory.x && x <= accessory.x + accessory.width &&
+                    y >= accessory.y && y <= accessory.y + accessory.height) {
+                    selectedAccessory = accessory;
+                    isDragging = true;
+                    startX = x - accessory.x;
+                    startY = y - accessory.y;
+                }
+            });
+            updateResizeHandle();
+        });
+
+        accessoryCanvas.addEventListener('touchmove', (e) => {
+            if (isDragging && selectedAccessory) {
+                const rect = accessoryCanvas.getBoundingClientRect();
+                selectedAccessory.x = e.touches[0].clientX - rect.left - startX;
+                selectedAccessory.y = e.touches[0].clientY - rect.top - startY;
+                drawAccessories();
+                updateResizeHandle();
+            }
+        });
+
+        accessoryCanvas.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        resizeHandle.addEventListener('touchstart', (e) => {
+            isResizing = true;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            e.stopPropagation();
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (isResizing && selectedAccessory) {
+                const deltaX = e.touches[0].clientX - startX;
+                const deltaY = e.touches[0].clientY - startY;
+                selectedAccessory.width += deltaX;
+                selectedAccessory.height += deltaY;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                drawAccessories();
+                updateResizeHandle();
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            isResizing = false;
+        });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
