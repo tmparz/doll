@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>紙娃娃功能</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .canvas-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            border: 1px solid #ccc;
+            margin: auto;
+        }
+        .canvas-container canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .accessories {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .accessories img {
+            width: 50px;
+            height: 50px;
+            margin: 0 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h2 class="mb-4 text-center">紙娃娃功能</h2>
+        <div class="text-center mb-3">
+            <input type="file" id="upload" accept="image/*">
+        </div>
+        <div class="canvas-container">
+            <canvas id="dollCanvas" width="400" height="600"></canvas>
+            <canvas id="accessoryCanvas" width="400" height="600"></canvas>
+        </div>
+        <div class="accessories">
+            <img src="Glasses.png" alt="Glasses" class="accessory" data-type="glasses">
+            <img src="clothes.png" alt="Clothes" class="accessory" data-type="clothes">
+        </div>
+        <div class="text-center mt-3">
+            <button id="downloadBtn" class="btn btn-primary">拍照下載</button>
+        </div>
+    </div>
+    <script>
+        const upload = document.getElementById('upload');
+        const dollCanvas = document.getElementById('dollCanvas');
+        const accessoryCanvas = document.getElementById('accessoryCanvas');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const dollCtx = dollCanvas.getContext('2d');
+        const accessoryCtx = accessoryCanvas.getContext('2d');
+
+        let accessories = {};
+        let selectedAccessory = null;
+        let isDragging = false;
+        let startX, startY;
+
+        function drawStickFigure(ctx) {
+            ctx.clearRect(0, 0, dollCanvas.width, dollCanvas.height);
+            ctx.beginPath();
+            ctx.arc(200, 100, 50, 0, Math.PI * 2, true);
+            ctx.moveTo(200, 150);
+            ctx.lineTo(200, 300);
+            ctx.moveTo(200, 200);
+            ctx.lineTo(150, 250);
+            ctx.moveTo(200, 200);
+            ctx.lineTo(250, 250);
+            ctx.moveTo(200, 300);
+            ctx.lineTo(150, 400);
+            ctx.moveTo(200, 300);
+            ctx.lineTo(250, 400);
+            ctx.stroke();
+        }
+
+        function drawAccessories() {
+            accessoryCtx.clearRect(0, 0, accessoryCanvas.width, accessoryCanvas.height);
+            Object.values(accessories).forEach(accessory => {
+                accessoryCtx.drawImage(accessory.img, accessory.x, accessory.y, accessory.width, accessory.height);
+            });
+        }
+
+        upload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    drawStickFigure(dollCtx);
+                    dollCtx.save();
+                    dollCtx.beginPath();
+                    dollCtx.arc(200, 100, 50, 0, Math.PI * 2, true);
+                    dollCtx.closePath();
+                    dollCtx.clip();
+                    dollCtx.drawImage(img, 150, 50, 100, 100);
+                    dollCtx.restore();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        document.querySelectorAll('.accessory').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const type = e.target.getAttribute('data-type');
+                const img = new Image();
+                img.onload = () => {
+                    accessories[type] = { img, x: 0, y: 0, width: 50, height: 50 };
+                    selectedAccessory = accessories[type];
+                    drawAccessories();
+                };
+                img.src = e.target.src;
+            });
+        });
+
+        accessoryCanvas.addEventListener('mousedown', (e) => {
+            const rect = accessoryCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            Object.values(accessories).forEach(accessory => {
+                if (x >= accessory.x && x <= accessory.x + accessory.width &&
+                    y >= accessory.y && y <= accessory.y + accessory.height) {
+                    selectedAccessory = accessory;
+                    isDragging = true;
+                    startX = x - accessory.x;
+                    startY = y - accessory.y;
+                }
+            });
+        });
+
+        accessoryCanvas.addEventListener('mousemove', (e) => {
+            if (isDragging && selectedAccessory) {
+                const rect = accessoryCanvas.getBoundingClientRect();
+                selectedAccessory.x = e.clientX - rect.left - startX;
+                selectedAccessory.y = e.clientY - rect.top - startY;
+                drawAccessories();
+            }
+        });
+
+        accessoryCanvas.addEventListener('mouseup', () => { isDragging = false; });
+
+        accessoryCanvas.addEventListener('wheel', (e) => {
+            if (selectedAccessory) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -5 : 5;
+                selectedAccessory.width = Math.max(10, selectedAccessory.width + delta);
+                selectedAccessory.height = Math.max(10, selectedAccessory.height + delta);
+                drawAccessories();
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = dollCanvas.width;
+            finalCanvas.height = dollCanvas.height;
+            const finalCtx = finalCanvas.getContext('2d');
+            finalCtx.drawImage(dollCanvas, 0, 0);
+            finalCtx.drawImage(accessoryCanvas, 0, 0);
+            const link = document.createElement('a');
+            link.download = 'doll.png';
+            link.href = finalCanvas.toDataURL();
+            link.click();
+        });
+    </script>
+</body>
+</html>
